@@ -2,9 +2,11 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import hre from "hardhat";
 
-const { viem } = await hre.network.create();
+const { networkHelpers, viem } = await hre.network.create();
+const blockTime = networkHelpers.time;
 
-// Note
+// Note:
+// All normal testcase transaction are within minimum requirement first
 /**
     enum WowoProposalStatus {
         Pending, // 0
@@ -42,6 +44,8 @@ describe("WowoIdeas", () => {
     const PublicClient = await viem.getPublicClient();
     return { WowoIdeas, owner, creator, reviewer, MinCollateral, PublicClient };
   }
+
+  // === Normal Test case ===
 
   // 1. deployement
   it("Must initialize contract rule correctly", async () => {
@@ -159,5 +163,89 @@ describe("WowoIdeas", () => {
       address: reviewer.account.address,
     });
     assert.equal(pastReviewerBalance, earlyReviewerBalance - requiredReward);
+  });
+
+  // 4. Proposal cancellation
+  it("Creator can cancel proposal before deadline and got 10% collateral penalty", async () => {
+    const { WowoIdeas, creator, MinCollateral, PublicClient } =
+      await DeployWowoIdeas();
+    const contractAsCreator = await viem.getContractAt(
+      "WowoIdeas",
+      WowoIdeas.address,
+      { client: { wallet: creator } },
+    );
+    const [testTitle, testDesc] = [
+      "Coba cancel",
+      "Proposal ini mau dicancel bang",
+    ];
+
+    // creator create proposal
+    await contractAsCreator.write.createProposal([testTitle, testDesc], {
+      value: MinCollateral,
+    });
+
+    // get creator balance before cancellation
+    const earlyCreatorBalance = await PublicClient.getBalance({
+      address: creator.account.address,
+    });
+
+    const hashCode = await contractAsCreator.write.cancelProposal([1n]);
+    const receipt = await PublicClient.waitForTransactionReceipt({
+      hash: hashCode,
+    });
+    const gasUsed = receipt.gasUsed * receipt.effectiveGasPrice;
+
+    // calc penalty
+    const penalty = (MinCollateral * 10n) / 100n;
+    const trueRefund = MinCollateral - penalty - gasUsed;
+
+    // check past balance of creator
+    const pastCreatorBalance = await PublicClient.getBalance({
+      address: creator.account.address,
+    });
+    assert.equal(pastCreatorBalance, earlyCreatorBalance + trueRefund);
+
+    // check proposal status
+    const [, , , , , , status] = await WowoIdeas.read.getProposalById([1n]);
+    assert.equal(status, 3);
+  });
+
+  it("Creator can claim 100% refund if proposal is expired", async () => {
+    const { WowoIdeas, creator, MinCollateral, PublicClient } =
+      await DeployWowoIdeas();
+    const contractAsCreator = await viem.getContractAt(
+      "WowoIdeas",
+      WowoIdeas.address,
+      { client: { wallet: creator } },
+    );
+    const [testTitle, testDesc] = [
+      "Mau dibiarin gan",
+      "Biarkan saja namanya juga kehidupan",
+    ];
+    contractAsCreator.write.createProposal([testTitle, testDesc], {
+      value: MinCollateral,
+    });
+    await blockTime.increase(8n * 24n * 60n * 60n);
+
+    // balance check
+    const earlyCreatorBalance = await PublicClient.getBalance({
+      address: creator.account.address,
+    });
+
+    const hashCode = await contractAsCreator.write.claimExpiredProposal([1n]);
+    const receipt = await PublicClient.waitForTransactionReceipt({
+      hash: hashCode,
+    });
+    const gasUsed = receipt.gasUsed * receipt.effectiveGasPrice;
+
+    const pastCreatorBalance = await PublicClient.getBalance({
+      address: creator.account.address,
+    });
+    assert.equal(
+      pastCreatorBalance,
+      earlyCreatorBalance + MinCollateral - gasUsed,
+    );
+    const [, , , , , , status] = await WowoIdeas.read.getProposalById([1n]);
+    assert.equal(status, 2);
   });
 });
