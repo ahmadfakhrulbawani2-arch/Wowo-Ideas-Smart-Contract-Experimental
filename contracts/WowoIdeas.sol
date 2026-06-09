@@ -17,10 +17,10 @@ pragma solidity ^0.8.20;
 contract WowoIdeas {
     // == proposal status
     enum WowoProposalStatus {
-        Pending,
-        Accepted,
-        Expired,
-        Cancelled
+        Pending, // 0
+        Accepted, // 1
+        Expired, // 2
+        Cancelled // 3
     }
 
     // === Proposal data structures ===
@@ -220,5 +220,10 @@ contract WowoIdeas {
             proposal.deadline,
             proposal.status
         );
+    }
+
+    // 6. READ: read how many proposals in this contract
+    function getProposalCount() external view returns (uint256 cnt) {
+        return Proposal_count;
     }
 }
