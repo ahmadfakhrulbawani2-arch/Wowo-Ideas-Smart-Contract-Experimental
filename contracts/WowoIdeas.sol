@@ -71,5 +71,154 @@ contract WowoIdeas {
     // === Smart contract detailed event list
 
     // 1. CREATE: create a proposal
-    
+    function createProposal(
+        string calldata _title,
+        string calldata _description
+    ) external payable {
+        require(
+            msg.value >= Proposal_min_collateral,
+            "Can't input collateral < smart contract minimum collateral"
+        );
+
+        uint256 _deadline = block.timestamp + Proposal_duration;
+        Proposal_count++;
+
+        Proposals[Proposal_count] = WowoProposal({
+            id: Proposal_count,
+            creator: payable(msg.sender),
+            title: _title,
+            description: _description,
+            collateral: msg.value,
+            deadline: _deadline,
+            status: WowoProposalStatus.Pending
+        });
+
+        emit ProposalCreated(
+            Proposal_count,
+            msg.sender,
+            _title,
+            msg.value,
+            _deadline
+        );
+    }
+
+    // 2. UPDATE: accepting proposal
+    function acceptProposal(uint256 _id) external payable {
+        // _id must valid, there's no id 0 as the first proposal id is 1
+        require(_id > 0 && _id <= Proposal_count, "Proposal don't exist");
+
+        WowoProposal storage proposal = Proposals[_id];
+
+        require(
+            msg.sender != proposal.creator,
+            "Can't accept your own proposal"
+        );
+        require(
+            proposal.status == WowoProposalStatus.Pending,
+            "Can only accept pending status proposal"
+        );
+        require(
+            block.timestamp <= proposal.deadline,
+            "Can't accept expired proposal"
+        );
+
+        // min required reward is 110%
+        uint256 requiredReward = (proposal.collateral * 110) / 100;
+        require(msg.value >= requiredReward, "Can't reward < 110% collateral");
+
+        // transfer & update data
+        proposal.status = WowoProposalStatus.Accepted;
+        uint256 totalFund = proposal.collateral + msg.value;
+        (bool success, ) = proposal.creator.call{value: totalFund}("");
+        require(success, "Transfer to creator failed");
+        emit ProposalAccepted(_id, msg.sender, msg.value);
+    }
+
+    // 3. DELETE: cancelling proposal, have penalty of 10%
+    function cancelProposal(uint256 _id) external {
+        // validation
+        require(_id > 0 && _id <= Proposal_count, "Proposal don't exist");
+        WowoProposal storage proposal = Proposals[_id];
+
+        require(msg.sender == proposal.creator, "Only creator can cancel");
+        require(
+            proposal.status == WowoProposalStatus.Pending,
+            "Proposal already processed"
+        );
+        require(
+            block.timestamp <= proposal.deadline,
+            "Proposal already expired, use claimExpired"
+        );
+
+        proposal.status = WowoProposalStatus.Cancelled;
+
+        // cut 10% penalty then transfer & update
+        uint256 penalty = (proposal.collateral * 10) / 100;
+        uint256 refundAmount = proposal.collateral - penalty;
+        proposal.collateral = 0;
+
+        (bool success, ) = proposal.creator.call{value: refundAmount}("");
+        require(success, "Refund failed");
+
+        emit ProposalCancelled(_id, refundAmount, penalty);
+    }
+
+    // 4. UPDATE/RECOVERY: claiming expired proposal, refunded 100%
+    function claimExpiredProposal(uint256 _id) external {
+        // validation
+        require(_id > 0 && _id <= Proposal_count, "Proposal don't exist");
+        WowoProposal storage proposal = Proposals[_id];
+
+        require(msg.sender == proposal.creator, "Only creator can claim");
+        require(
+            proposal.status == WowoProposalStatus.Pending,
+            "Proposal already processed"
+        );
+        require(
+            block.timestamp > proposal.deadline,
+            "Proposal is not expired yet"
+        );
+
+        // transfer & update data
+        proposal.status = WowoProposalStatus.Expired;
+        uint256 refundAmount = proposal.collateral;
+        proposal.collateral = 0;
+        (bool success, ) = proposal.creator.call{value: refundAmount}("");
+        require(success, "Refund failed");
+        emit ProposalClaimed(_id, refundAmount);
+    }
+
+    // 5. READ: reading proposal data by id
+    function getProposalById(
+        uint256 _id
+    )
+        external
+        view
+        returns (
+            uint256 id,
+            address creator,
+            string memory title,
+            string memory description,
+            uint256 collateral,
+            uint256 deadline,
+            WowoProposalStatus status
+        )
+    {
+        // validation
+        require(_id > 0 && _id <= Proposal_count, "Proposal don't exist");
+
+        // fetch
+        WowoProposal storage proposal = Proposals[_id];
+
+        // return
+        return (
+            proposal.id,
+            proposal.creator,
+            proposal.title,
+            proposal.description,
+            proposal.collateral,
+            proposal.deadline,
+            proposal.status
+        );
+    }
 }
