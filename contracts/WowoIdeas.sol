@@ -103,7 +103,36 @@ contract WowoIdeas {
     }
 
     // 2. UPDATE: accepting proposal
-    
+    function acceptProposal(uint256 _id) external payable {
+        // _id must valid, there's no id 0 as the first proposal id is 1
+        require(_id > 0 && _id <= Proposal_count, "Proposal don't exist");
+
+        WowoProposal storage proposal = Proposals[_id];
+
+        require(
+            msg.sender != proposal.creator,
+            "Can't accept your own proposal"
+        );
+        require(
+            proposal.status == WowoProposalStatus.Pending,
+            "Can only accept pending status proposal"
+        );
+        require(
+            block.timestamp <= proposal.deadline,
+            "Can't accept expired proposal"
+        );
+
+        // min required reward is 110%
+        uint256 requiredReward = (proposal.collateral * 110) / 100;
+        require(msg.value >= requiredReward, "Can't reward < 110% collateral");
+
+        // transfer & update data
+        proposal.status = WowoProposalStatus.Accepted;
+        uint256 totalFund = proposal.collateral + msg.value;
+        (bool success, ) = proposal.creator.call{value: totalFund}("");
+        require(success, "Transfer to creator failed");
+        emit ProposalAccepted(_id, msg.sender, msg.value);
+    }
 
     // 3. DELETE: cancelling proposal, have penalty of 10%
     function cancelProposal(uint256 _id) external {
