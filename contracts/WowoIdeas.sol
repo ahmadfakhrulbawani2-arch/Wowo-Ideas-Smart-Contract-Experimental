@@ -71,36 +71,7 @@ contract WowoIdeas {
     // === Smart contract detailed event list
 
     // 1. CREATE: create a proposal
-    function createProposal(
-        string calldata _title,
-        string calldata _description
-    ) external payable {
-        require(
-            msg.value >= Proposal_min_collateral,
-            "Can't input collateral < smart contract minimum collateral"
-        );
-
-        uint256 _deadline = block.timestamp + Proposal_duration;
-        Proposal_count++;
-
-        Proposals[Proposal_count] = WowoProposal({
-            id: Proposal_count,
-            creator: payable(msg.sender),
-            title: _title,
-            description: _description,
-            collateral: msg.value,
-            deadline: _deadline,
-            status: WowoProposalStatus.Pending
-        });
-
-        emit ProposalCreated(
-            Proposal_count,
-            msg.sender,
-            _title,
-            msg.value,
-            _deadline
-        );
-    }
+    
 
     // 2. UPDATE: accepting proposal
     function acceptProposal(uint256 _id) external payable {
