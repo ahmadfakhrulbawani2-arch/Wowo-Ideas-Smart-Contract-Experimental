@@ -9,6 +9,14 @@
   <img src="https://img.shields.io/github/forks/ahmadfakhrulbawani2-arch/Wowo-Ideas-Smart-Contract-Experimental?style=for-the-badge&color=purple">
 </div>
 
+<br /><br /><br />
+
+<div align="center">
+  <img src="./docs/WELCOME TO DASPROG.png"><br />
+  <p>I LOVE WOWO SO FREAKING HARDD 😲😍🥰😘</p>
+  <p>AKU PADAMUUU AHHHHH</p><br /><br />
+</div>
+
 Wowo Ideas is an experimental decentralized idea marketplace platform built on top of the Ethereum Virtual Machine (EVM). This smart contract allows users to publish their creative ideas onto the blockchain in a secure, state-protected proposal format. Innovators (_creators_) can monetize their intellectual property, while interested parties (_buyers_) can seamlessly fund or acquire the underlying details of the idea.
 
 ---
@@ -140,6 +148,14 @@ git checkout -b <your_branch_name>
 2. Make your changes and publish the branch.
 3. Make pull request in Github or thhrough your prefered way.
 4. Creating issue is also preferred.
+
+## 🖼️ Documentation
+
+Coming soon.
+
+## 📈 Further Development
+
+Building Front-end and back-end coming soon.
 
 📜 License
 This project is licensed under the MIT License. Feel free to use, modify, and distribute it for educational or experimental Web3 development.
