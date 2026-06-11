@@ -4,9 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "compile": "./scripts/contracts/Compile.sh",
-    "dev": "./scripts/contracts/Deploy.sh",
-    "testMain": "./scripts/contracts/'TestMain.sh",
+    "compile": "bash scripts/contracts/Compile.sh",
+    "dev": "bash scripts/contracts/Deploy.sh",
+    "testMain": "bash scripts/contracts/TestMain.sh",
     "test": "npx hardhat test"
   },
   "keywords": [],
