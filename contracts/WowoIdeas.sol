@@ -23,15 +23,18 @@ contract WowoIdeas {
         Cancelled // 3
     }
 
+    // pentingnya belajar DSA ya adick-adick
     // === Proposal data structures ===
     struct WowoProposal {
         uint256 id;
         address payable creator;
-        string title;
-        string description;
+        address buyer;
+        WowoProposalStatus status; // Dipindah ke sini agar nempel hemat slot dengan buyer
         uint256 collateral;
         uint256 deadline;
-        WowoProposalStatus status;
+        string title;
+        string description;
+        string detail;
     }
 
     // === Smart contract rules ===
@@ -46,7 +49,8 @@ contract WowoIdeas {
     }
 
     uint256 public Proposal_count;
-    mapping(uint256 => WowoProposal) public Proposals;
+    uint256 public penaltiesAccumulator; // storring total penalties
+    mapping(uint256 => WowoProposal) public Proposals; // storing proposal data
 
     // === Smart contract event list
     event ProposalCreated(
@@ -68,12 +72,18 @@ contract WowoIdeas {
     );
     event ProposalClaimed(uint256 indexed id, uint256 refunded);
 
+    // ===== ADMIN SPACE =====
+    event WithdrawPenalties(address owner, uint256 refund);
+
+    // ===== ADMIN SPACE =====
+
     // === Smart contract detailed event list
 
     // 1. CREATE: create a proposal
     function createProposal(
         string calldata _title,
-        string calldata _description
+        string calldata _description,
+        string calldata _detail
     ) external payable {
         require(
             msg.value >= Proposal_min_collateral,
@@ -86,8 +96,10 @@ contract WowoIdeas {
         Proposals[Proposal_count] = WowoProposal({
             id: Proposal_count,
             creator: payable(msg.sender),
+            buyer: address(0), // this means 0x000000000000000000 or null address
             title: _title,
             description: _description,
+            detail: _detail,
             collateral: msg.value,
             deadline: _deadline,
             status: WowoProposalStatus.Pending
@@ -128,6 +140,7 @@ contract WowoIdeas {
 
         // transfer & update data
         proposal.status = WowoProposalStatus.Accepted;
+        proposal.buyer = msg.sender;
         uint256 totalFund = proposal.collateral + msg.value;
         (bool success, ) = proposal.creator.call{value: totalFund}("");
         require(success, "Transfer to creator failed");
@@ -156,6 +169,8 @@ contract WowoIdeas {
         uint256 penalty = (proposal.collateral * 10) / 100;
         uint256 refundAmount = proposal.collateral - penalty;
         proposal.collateral = 0;
+
+        penaltiesAccumulator += penalty;
 
         (bool success, ) = proposal.creator.call{value: refundAmount}("");
         require(success, "Refund failed");
@@ -197,6 +212,7 @@ contract WowoIdeas {
         returns (
             uint256 id,
             address creator,
+            address buyer,
             string memory title,
             string memory description,
             uint256 collateral,
@@ -214,6 +230,7 @@ contract WowoIdeas {
         return (
             proposal.id,
             proposal.creator,
+            proposal.buyer,
             proposal.title,
             proposal.description,
             proposal.collateral,
@@ -226,4 +243,41 @@ contract WowoIdeas {
     function getProposalCount() external view returns (uint256 cnt) {
         return Proposal_count;
     }
+
+    // 7. READ: read proposal detail
+    function getProposalDetail(
+        uint256 _id
+    ) external view returns (string memory detail) {
+        // validation
+        require(_id > 0 && _id <= Proposal_count, "Proposal don't exist");
+        WowoProposal storage proposal = Proposals[_id];
+        require(
+            proposal.status == WowoProposalStatus.Accepted,
+            "Proposal not accepted yet"
+        );
+        require(
+            proposal.buyer == msg.sender || proposal.creator == msg.sender,
+            "Can't access proposal detail"
+        );
+
+        return proposal.detail;
+    }
+
+    // ===== ADMIN SPACE =====
+    // withdraw penalties
+    function withdrawPenalties() external {
+        require(msg.sender == Owner, "Only owner can access");
+
+        uint256 amountToWithdraw = penaltiesAccumulator; // Baca storage 1x (Hemat Gas)
+        require(amountToWithdraw > 0, "No funds to withdraw");
+
+        penaltiesAccumulator = 0; // EFFECTS: Reset dulu sebelum transfer (100% AMAN)
+
+        // INTERACTIONS: Baru kirim duitnya keluar
+        (bool success, ) = payable(Owner).call{value: amountToWithdraw}("");
+        require(success, "Withdraw failed");
+
+        emit WithdrawPenalties(msg.sender, amountToWithdraw);
+    }
+    // ===== ADMIN SPACE =====
 }
