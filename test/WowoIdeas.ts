@@ -42,14 +42,18 @@ describe("WowoIdeas Testing Suite", () => {
     async function setup() {
       const ctx = await DeployWowoIdeas();
       const contractOwner = await ctx.WowoIdeas.read.Owner();
-      const currentMinCollateral = await ctx.WowoIdeas.read.Proposal_min_collateral();
+      const currentMinCollateral =
+        await ctx.WowoIdeas.read.Proposal_min_collateral();
       const currentDuration = await ctx.WowoIdeas.read.Proposal_duration();
       return { ...ctx, contractOwner, currentMinCollateral, currentDuration };
     }
 
     it("should set the correct contract owner", async () => {
       const { contractOwner, owner } = await setup();
-      assert.equal(contractOwner.toLowerCase(), owner.account.address.toLowerCase());
+      assert.equal(
+        contractOwner.toLowerCase(),
+        owner.account.address.toLowerCase(),
+      );
     });
 
     it("should set the correct minimum collateral limit", async () => {
@@ -69,9 +73,13 @@ describe("WowoIdeas Testing Suite", () => {
   describe("Function: createProposal", () => {
     async function setupCreation() {
       const ctx = await DeployWowoIdeas();
-      const contractAsCreator = await viem.getContractAt("WowoIdeas", ctx.WowoIdeas.address, {
-        client: { wallet: ctx.creator },
-      });
+      const contractAsCreator = await viem.getContractAt(
+        "WowoIdeas",
+        ctx.WowoIdeas.address,
+        {
+          client: { wallet: ctx.creator },
+        },
+      );
 
       const earlyCreatorBalance = await ctx.PublicClient.getBalance({
         address: ctx.creator.account.address,
@@ -83,10 +91,15 @@ describe("WowoIdeas Testing Suite", () => {
         "Ini detail proposal lengkap ditaruh di sini",
       ];
 
-      const hash = await contractAsCreator.write.createProposal([testTitle, testDesc, testDetail], {
-        value: ctx.MinCollateral,
+      const hash = await contractAsCreator.write.createProposal(
+        [testTitle, testDesc, testDetail],
+        {
+          value: ctx.MinCollateral,
+        },
+      );
+      const receipt = await ctx.PublicClient.waitForTransactionReceipt({
+        hash,
       });
-      const receipt = await ctx.PublicClient.waitForTransactionReceipt({ hash });
       const gasUsed = receipt.gasUsed * receipt.effectiveGasPrice;
 
       const proposalCount = await ctx.WowoIdeas.read.getProposalCount();
@@ -120,12 +133,18 @@ describe("WowoIdeas Testing Suite", () => {
 
       it("should register the caller address as the proposal creator", async () => {
         const { proposalData, creator } = await setupCreation();
-        assert.equal(proposalData[1].toLowerCase(), creator.account.address.toLowerCase());
+        assert.equal(
+          proposalData[1].toLowerCase(),
+          creator.account.address.toLowerCase(),
+        );
       });
 
       it("should initialize the proposal buyer with an empty null address", async () => {
         const { proposalData } = await setupCreation();
-        assert.equal(proposalData[2], "0x0000000000000000000000000000000000000000");
+        assert.equal(
+          proposalData[2],
+          "0x0000000000000000000000000000000000000000",
+        );
       });
 
       it("should store the correct proposal title text", async () => {
@@ -149,25 +168,43 @@ describe("WowoIdeas Testing Suite", () => {
       });
 
       it("should charge the exact collateral and gas fee from creator's wallet", async () => {
-        const { pastCreatorBalance, earlyCreatorBalance, MinCollateral, gasUsed } = await setupCreation();
-        assert.equal(pastCreatorBalance, earlyCreatorBalance - MinCollateral - gasUsed);
+        const {
+          pastCreatorBalance,
+          earlyCreatorBalance,
+          MinCollateral,
+          gasUsed,
+        } = await setupCreation();
+        assert.equal(
+          pastCreatorBalance,
+          earlyCreatorBalance - MinCollateral - gasUsed,
+        );
       });
     });
 
     describe("Validation Cases", () => {
       it("should revert if user sends collateral lower than contract rule minimum", async () => {
         const { WowoIdeas, creator, MinCollateral } = await DeployWowoIdeas();
-        const contractAsCreator = await viem.getContractAt("WowoIdeas", WowoIdeas.address, {
-          client: { wallet: creator },
-        });
+        const contractAsCreator = await viem.getContractAt(
+          "WowoIdeas",
+          WowoIdeas.address,
+          {
+            client: { wallet: creator },
+          },
+        );
 
         try {
-          await contractAsCreator.write.createProposal(["Title", "Desc", "Detail"], {
-            value: MinCollateral - 1n,
-          });
+          await contractAsCreator.write.createProposal(
+            ["Title", "Desc", "Detail"],
+            {
+              value: MinCollateral - 1n,
+            },
+          );
           assert.fail("Execution should fail due to low collateral");
         } catch (error: any) {
-          assert.match(error.message, /Can't input collateral < smart contract minimum collateral/);
+          assert.match(
+            error.message,
+            /Can't input collateral < smart contract minimum collateral/,
+          );
         }
       });
     });
@@ -179,30 +216,54 @@ describe("WowoIdeas Testing Suite", () => {
   describe("Function: acceptProposal", () => {
     async function setupAcceptance() {
       const ctx = await DeployWowoIdeas();
-      const contractAsCreator = await viem.getContractAt("WowoIdeas", ctx.WowoIdeas.address, {
-        client: { wallet: ctx.creator },
-      });
-      const contractAsReviewer = await viem.getContractAt("WowoIdeas", ctx.WowoIdeas.address, {
-        client: { wallet: ctx.reviewer },
-      });
+      const contractAsCreator = await viem.getContractAt(
+        "WowoIdeas",
+        ctx.WowoIdeas.address,
+        {
+          client: { wallet: ctx.creator },
+        },
+      );
+      const contractAsReviewer = await viem.getContractAt(
+        "WowoIdeas",
+        ctx.WowoIdeas.address,
+        {
+          client: { wallet: ctx.reviewer },
+        },
+      );
 
-      const createHash = await contractAsCreator.write.createProposal(["Ide", "Desc", "Detail"], {
-        value: ctx.MinCollateral,
-      });
+      const createHash = await contractAsCreator.write.createProposal(
+        ["Ide", "Desc", "Detail"],
+        {
+          value: ctx.MinCollateral,
+        },
+      );
       await ctx.PublicClient.waitForTransactionReceipt({ hash: createHash });
 
       const requiredReward = (ctx.MinCollateral * 110n) / 100n;
 
-      const earlyCreatorBalance = await ctx.PublicClient.getBalance({ address: ctx.creator.account.address });
-      const earlyReviewerBalance = await ctx.PublicClient.getBalance({ address: ctx.reviewer.account.address });
+      const earlyCreatorBalance = await ctx.PublicClient.getBalance({
+        address: ctx.creator.account.address,
+      });
+      const earlyReviewerBalance = await ctx.PublicClient.getBalance({
+        address: ctx.reviewer.account.address,
+      });
 
-      const acceptHash = await contractAsReviewer.write.acceptProposal([1n], { value: requiredReward });
-      const acceptReceipt = await ctx.PublicClient.waitForTransactionReceipt({ hash: acceptHash });
-      const reviewerGasUsed = acceptReceipt.gasUsed * acceptReceipt.effectiveGasPrice;
+      const acceptHash = await contractAsReviewer.write.acceptProposal([1n], {
+        value: requiredReward,
+      });
+      const acceptReceipt = await ctx.PublicClient.waitForTransactionReceipt({
+        hash: acceptHash,
+      });
+      const reviewerGasUsed =
+        acceptReceipt.gasUsed * acceptReceipt.effectiveGasPrice;
 
       const proposalData = await ctx.WowoIdeas.read.getProposalById([1n]);
-      const pastCreatorBalance = await ctx.PublicClient.getBalance({ address: ctx.creator.account.address });
-      const pastReviewerBalance = await ctx.PublicClient.getBalance({ address: ctx.reviewer.account.address });
+      const pastCreatorBalance = await ctx.PublicClient.getBalance({
+        address: ctx.creator.account.address,
+      });
+      const pastReviewerBalance = await ctx.PublicClient.getBalance({
+        address: ctx.reviewer.account.address,
+      });
 
       return {
         ...ctx,
@@ -214,7 +275,7 @@ describe("WowoIdeas Testing Suite", () => {
         pastReviewerBalance,
         reviewerGasUsed,
         contractAsCreator,
-        contractAsReviewer
+        contractAsReviewer,
       };
     }
 
@@ -226,25 +287,56 @@ describe("WowoIdeas Testing Suite", () => {
 
       it("should update buyer field with the reviewer's address", async () => {
         const { proposalData, reviewer } = await setupAcceptance();
-        assert.equal(proposalData[2].toLowerCase(), reviewer.account.address.toLowerCase());
+        assert.equal(
+          proposalData[2].toLowerCase(),
+          reviewer.account.address.toLowerCase(),
+        );
       });
 
       it("should route the collateral refund plus reward premium back to creator", async () => {
-        const { pastCreatorBalance, earlyCreatorBalance, MinCollateral, requiredReward } = await setupAcceptance();
-        assert.equal(pastCreatorBalance, earlyCreatorBalance + MinCollateral + requiredReward);
+        const {
+          pastCreatorBalance,
+          earlyCreatorBalance,
+          MinCollateral,
+          requiredReward,
+        } = await setupAcceptance();
+        assert.equal(
+          pastCreatorBalance,
+          earlyCreatorBalance + MinCollateral + requiredReward,
+        );
       });
 
       it("should deduct exact reward package and processing gas from reviewer's wallet", async () => {
-        const { pastReviewerBalance, earlyReviewerBalance, requiredReward, reviewerGasUsed } = await setupAcceptance();
-        assert.equal(pastReviewerBalance, earlyReviewerBalance - requiredReward - reviewerGasUsed);
+        const {
+          pastReviewerBalance,
+          earlyReviewerBalance,
+          requiredReward,
+          reviewerGasUsed,
+        } = await setupAcceptance();
+        assert.equal(
+          pastReviewerBalance,
+          earlyReviewerBalance - requiredReward - reviewerGasUsed,
+        );
       });
     });
 
     describe("Validation Cases", () => {
       it("should revert if creator tries to accept their own open proposal", async () => {
         const { contractAsCreator, MinCollateral } = await setupAcceptance();
+
+        // Buat proposal baru (ID 2n) yang statusnya masih Pending
+        const hash = await contractAsCreator.write.createProposal(
+          ["Judul Baru", "Desc", "Detail"],
+          { value: MinCollateral },
+        );
+        const PublicClient = await viem.getPublicClient();
+        await PublicClient.waitForTransactionReceipt({ hash });
+
         try {
-          await contractAsCreator.write.acceptProposal([1n], { value: (MinCollateral * 110n) / 100n });
+          // Coba accept proposal milik sendiri (ID 2n)
+          await contractAsCreator.write.acceptProposal([2n], {
+            value: (MinCollateral * 110n) / 100n,
+          });
           assert.fail("Execution should fail when creator matches reviewer");
         } catch (error: any) {
           assert.match(error.message, /Can't accept your own proposal/);
@@ -252,10 +344,23 @@ describe("WowoIdeas Testing Suite", () => {
       });
 
       it("should revert if processing value is strictly less than 110% premium threshold", async () => {
-        const { contractAsReviewer, MinCollateral } = await setupAcceptance();
-        const badReward = ((MinCollateral * 110n) / 100n) - 1n;
+        const { contractAsCreator, contractAsReviewer, MinCollateral } =
+          await setupAcceptance();
+
+        // Buat proposal baru (ID 2n) yang statusnya masih Pending
+        const hash = await contractAsCreator.write.createProposal(
+          ["Judul Baru 2", "Desc", "Detail"],
+          { value: MinCollateral },
+        );
+        const PublicClient = await viem.getPublicClient();
+        await PublicClient.waitForTransactionReceipt({ hash });
+
+        const badReward = (MinCollateral * 110n) / 100n - 1n;
         try {
-          await contractAsReviewer.write.acceptProposal([1n], { value: badReward });
+          // Tembak proposal baru (ID 2n) dengan dana kurang
+          await contractAsReviewer.write.acceptProposal([2n], {
+            value: badReward,
+          });
           assert.fail("Execution should fail due to low premium reward");
         } catch (error: any) {
           assert.match(error.message, /Can't reward < 110% collateral/);
@@ -270,28 +375,47 @@ describe("WowoIdeas Testing Suite", () => {
   describe("Function: cancelProposal", () => {
     async function setupCancellation() {
       const ctx = await DeployWowoIdeas();
-      const contractAsCreator = await viem.getContractAt("WowoIdeas", ctx.WowoIdeas.address, {
-        client: { wallet: ctx.creator },
-      });
+      const contractAsCreator = await viem.getContractAt(
+        "WowoIdeas",
+        ctx.WowoIdeas.address,
+        {
+          client: { wallet: ctx.creator },
+        },
+      );
 
-      const createHash = await contractAsCreator.write.createProposal(["Cancel", "Desc", "Detail"], {
-        value: ctx.MinCollateral,
-      });
+      const createHash = await contractAsCreator.write.createProposal(
+        ["Cancel", "Desc", "Detail"],
+        {
+          value: ctx.MinCollateral,
+        },
+      );
       await ctx.PublicClient.waitForTransactionReceipt({ hash: createHash });
 
-      const earlyCreatorBalance = await ctx.PublicClient.getBalance({ address: ctx.creator.account.address });
+      const earlyCreatorBalance = await ctx.PublicClient.getBalance({
+        address: ctx.creator.account.address,
+      });
 
       const hashCode = await contractAsCreator.write.cancelProposal([1n]);
-      const receipt = await ctx.PublicClient.waitForTransactionReceipt({ hash: hashCode });
+      const receipt = await ctx.PublicClient.waitForTransactionReceipt({
+        hash: hashCode,
+      });
       const gasUsed = receipt.gasUsed * receipt.effectiveGasPrice;
 
       const penalty = (ctx.MinCollateral * 10n) / 100n;
       const trueRefund = ctx.MinCollateral - penalty - gasUsed;
 
       const proposalData = await ctx.WowoIdeas.read.getProposalById([1n]);
-      const pastCreatorBalance = await ctx.PublicClient.getBalance({ address: ctx.creator.account.address });
+      const pastCreatorBalance = await ctx.PublicClient.getBalance({
+        address: ctx.creator.account.address,
+      });
 
-      return { ...ctx, proposalData, pastCreatorBalance, earlyCreatorBalance, trueRefund };
+      return {
+        ...ctx,
+        proposalData,
+        pastCreatorBalance,
+        earlyCreatorBalance,
+        trueRefund,
+      };
     }
 
     describe("Success Cases", () => {
@@ -301,7 +425,8 @@ describe("WowoIdeas Testing Suite", () => {
       });
 
       it("should deliver a 90% partial refund minus transaction gas back to creator", async () => {
-        const { pastCreatorBalance, earlyCreatorBalance, trueRefund } = await setupCancellation();
+        const { pastCreatorBalance, earlyCreatorBalance, trueRefund } =
+          await setupCancellation();
         assert.equal(pastCreatorBalance, earlyCreatorBalance + trueRefund);
       });
     });
@@ -313,28 +438,47 @@ describe("WowoIdeas Testing Suite", () => {
   describe("Function: claimExpiredProposal", () => {
     async function setupExpiration() {
       const ctx = await DeployWowoIdeas();
-      const contractAsCreator = await viem.getContractAt("WowoIdeas", ctx.WowoIdeas.address, {
-        client: { wallet: ctx.creator },
-      });
+      const contractAsCreator = await viem.getContractAt(
+        "WowoIdeas",
+        ctx.WowoIdeas.address,
+        {
+          client: { wallet: ctx.creator },
+        },
+      );
 
-      const createHash = await contractAsCreator.write.createProposal(["Expire", "Desc", "Detail"], {
-        value: ctx.MinCollateral,
-      });
+      const createHash = await contractAsCreator.write.createProposal(
+        ["Expire", "Desc", "Detail"],
+        {
+          value: ctx.MinCollateral,
+        },
+      );
       await ctx.PublicClient.waitForTransactionReceipt({ hash: createHash });
 
       // Fast forward timeline past the contract duration boundaries
       await blockTime.increase(8n * 24n * 60n * 60n);
 
-      const earlyCreatorBalance = await ctx.PublicClient.getBalance({ address: ctx.creator.account.address });
+      const earlyCreatorBalance = await ctx.PublicClient.getBalance({
+        address: ctx.creator.account.address,
+      });
 
       const hashCode = await contractAsCreator.write.claimExpiredProposal([1n]);
-      const receipt = await ctx.PublicClient.waitForTransactionReceipt({ hash: hashCode });
+      const receipt = await ctx.PublicClient.waitForTransactionReceipt({
+        hash: hashCode,
+      });
       const gasUsed = receipt.gasUsed * receipt.effectiveGasPrice;
 
       const proposalData = await ctx.WowoIdeas.read.getProposalById([1n]);
-      const pastCreatorBalance = await ctx.PublicClient.getBalance({ address: ctx.creator.account.address });
+      const pastCreatorBalance = await ctx.PublicClient.getBalance({
+        address: ctx.creator.account.address,
+      });
 
-      return { ...ctx, proposalData, pastCreatorBalance, earlyCreatorBalance, gasUsed };
+      return {
+        ...ctx,
+        proposalData,
+        pastCreatorBalance,
+        earlyCreatorBalance,
+        gasUsed,
+      };
     }
 
     describe("Success Cases", () => {
@@ -344,8 +488,16 @@ describe("WowoIdeas Testing Suite", () => {
       });
 
       it("should process a clean 100% collateral refund minus execution gas to creator", async () => {
-        const { pastCreatorBalance, earlyCreatorBalance, MinCollateral, gasUsed } = await setupExpiration();
-        assert.equal(pastCreatorBalance, earlyCreatorBalance + MinCollateral - gasUsed);
+        const {
+          pastCreatorBalance,
+          earlyCreatorBalance,
+          MinCollateral,
+          gasUsed,
+        } = await setupExpiration();
+        assert.equal(
+          pastCreatorBalance,
+          earlyCreatorBalance + MinCollateral - gasUsed,
+        );
       });
     });
   });
