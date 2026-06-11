@@ -22,7 +22,7 @@ const blockTime = networkHelpers.time;
 describe("WowoIdeas Testing Suite", () => {
   // Shared Deployment Setup
   async function DeployWowoIdeas() {
-    const [owner, creator, reviewer] = await viem.getWalletClients();
+    const [owner, creator, reviewer, other] = await viem.getWalletClients();
     const MinCollateral = 10000000000000n; // 0.00001 ETH
     const DurationExpiredInDays = 7n;
 
@@ -32,7 +32,15 @@ describe("WowoIdeas Testing Suite", () => {
     ]);
 
     const PublicClient = await viem.getPublicClient();
-    return { WowoIdeas, owner, creator, reviewer, MinCollateral, PublicClient };
+    return {
+      WowoIdeas,
+      owner,
+      creator,
+      reviewer,
+      other,
+      MinCollateral,
+      PublicClient,
+    };
   }
 
   // =========================================================================
@@ -498,6 +506,184 @@ describe("WowoIdeas Testing Suite", () => {
           pastCreatorBalance,
           earlyCreatorBalance + MinCollateral - gasUsed,
         );
+      });
+    });
+  });
+  // =========================================================================
+  // 6. GETTER / READ FUNCTIONS TESTING
+  // =========================================================================
+  describe("Getter Functions", () => {
+    // Helper setup khusus untuk memancit data awal agar bisa dibaca
+    async function setupGetters() {
+      const ctx = await DeployWowoIdeas();
+      const contractAsCreator = await viem.getContractAt(
+        "WowoIdeas",
+        ctx.WowoIdeas.address,
+        {
+          client: { wallet: ctx.creator },
+        },
+      );
+      const contractAsReviewer = await viem.getContractAt(
+        "WowoIdeas",
+        ctx.WowoIdeas.address,
+        {
+          client: { wallet: ctx.reviewer },
+        },
+      );
+
+      const [testTitle, testDesc, testDetail] = [
+        "Judul Tes",
+        "Deskripsi Tes",
+        "Detail Rahasia",
+      ];
+
+      // 1. Buat Proposal ID 1n (Akan dibiarkan Pending)
+      const hash1 = await contractAsCreator.write.createProposal(
+        [testTitle, testDesc, testDetail],
+        {
+          value: ctx.MinCollateral,
+        },
+      );
+      await ctx.PublicClient.waitForTransactionReceipt({ hash: hash1 });
+
+      // 2. Buat Proposal ID 2n (Akan langsung di-accept oleh Reviewer/Buyer)
+      const hash2 = await contractAsCreator.write.createProposal(
+        ["Proposal Dua", "Desc", "Detail 2"],
+        {
+          value: ctx.MinCollateral,
+        },
+      );
+      await ctx.PublicClient.waitForTransactionReceipt({ hash: hash2 });
+
+      const requiredReward = (ctx.MinCollateral * 110n) / 100n;
+      const acceptHash = await contractAsReviewer.write.acceptProposal([2n], {
+        value: requiredReward,
+      });
+      await ctx.PublicClient.waitForTransactionReceipt({ hash: acceptHash });
+
+      return {
+        ...ctx,
+        contractAsCreator,
+        contractAsReviewer,
+        testTitle,
+        testDesc,
+        testDetail,
+      };
+    }
+
+    // --- Testing getProposalCount ---
+    describe("Function: getProposalCount", () => {
+      it("should return 0 when no proposals have been created yet", async () => {
+        const { WowoIdeas } = await DeployWowoIdeas();
+        const count = await WowoIdeas.read.getProposalCount();
+        assert.equal(count, 0n);
+      });
+
+      it("should return the exact total number of registered proposals", async () => {
+        const { WowoIdeas } = await setupGetters();
+        const count = await WowoIdeas.read.getProposalCount();
+        assert.equal(count, 2n); // Karena kita buat 2 proposal di setup
+      });
+    });
+
+    // --- Testing getProposalById ---
+    describe("Function: getProposalById", () => {
+      it("should revert if fetching a non-existent lower-bound proposal ID (0n)", async () => {
+        const { WowoIdeas } = await setupGetters();
+        try {
+          await WowoIdeas.read.getProposalById([0n]);
+          assert.fail("Should fail for ID 0");
+        } catch (error: any) {
+          assert.match(error.message, /Proposal don't exist/);
+        }
+      });
+
+      it("should revert if fetching an out-of-bounds higher proposal ID", async () => {
+        const { WowoIdeas } = await setupGetters();
+        try {
+          await WowoIdeas.read.getProposalById([99n]);
+          assert.fail("Should fail for non-existent ID");
+        } catch (error: any) {
+          assert.match(error.message, /Proposal don't exist/);
+        }
+      });
+
+      it("should return correct structural metadata for a valid proposal ID", async () => {
+        const { WowoIdeas, creator, testTitle, testDesc, MinCollateral } =
+          await setupGetters();
+        const data = await WowoIdeas.read.getProposalById([1n]);
+
+        assert.equal(data[0], 1n); // id
+        assert.equal(
+          data[1].toLowerCase(),
+          creator.account.address.toLowerCase(),
+        ); // creator
+        assert.equal(data[3], testTitle); // title
+        assert.equal(data[4], testDesc); // description
+        assert.equal(data[5], MinCollateral); // collateral
+        assert.equal(data[7], 0); // status (0 = Pending)
+      });
+    });
+    // --- Testing getProposalDetail ---
+    describe("Function: getProposalDetail", () => {
+      describe("Success Cases", () => {
+        it("should allow the creator to read the proposal detail text", async () => {
+          const { WowoIdeas, creator } = await setupGetters();
+
+          // ID 2n di setup memiliki detail "Detail 2"
+          const detail = await WowoIdeas.read.getProposalDetail([2n], {
+            account: creator.account,
+          });
+          assert.equal(detail, "Detail 2");
+        });
+
+        it("should allow the verified buyer/reviewer to read the proposal detail text", async () => {
+          const { WowoIdeas, reviewer } = await setupGetters();
+
+          const detail = await WowoIdeas.read.getProposalDetail([2n], {
+            account: reviewer.account,
+          });
+          assert.equal(detail, "Detail 2");
+        });
+      });
+
+      describe("Validation & Access Control Cases", () => {
+        it("should revert if the proposal status is still Pending & not accessed by the buyer nor creator", async () => {
+          const { WowoIdeas, other } = await setupGetters();
+
+          let threwError = false;
+          try {
+            // ID 1n statusnya masih Pending di helper setup
+            await WowoIdeas.read.getProposalDetail([1n], {
+              account: other.account,
+            });
+          } catch (error: any) {
+            threwError = true;
+            assert.match(error.message, /Can't access proposal detail/);
+          }
+
+          if (!threwError) {
+            assert.fail("Should fail because status is not Accepted");
+          }
+        });
+
+        it("should revert if accessed by an unverified third-party wallet address like owner", async () => {
+          const { WowoIdeas, owner } = await setupGetters();
+
+          let threwError = false;
+          try {
+            await WowoIdeas.read.getProposalDetail([2n], {
+              account: owner.account,
+            });
+          } catch (error: any) {
+            threwError = true;
+            assert.match(error.message, /Can't access proposal detail/);
+          }
+
+          if (!threwError) {
+            assert.fail("Should block unauthorized third party");
+          }
+        });
       });
     });
   });

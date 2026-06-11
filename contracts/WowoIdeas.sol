@@ -245,19 +245,29 @@ contract WowoIdeas {
     }
 
     // 7. READ: read proposal detail
+    // 7. READ: read proposal detail
     function getProposalDetail(
         uint256 _id
     ) external view returns (string memory detail) {
-        // validation
         require(_id > 0 && _id <= Proposal_count, "Proposal don't exist");
         WowoProposal storage proposal = Proposals[_id];
+
+        // Amankan gerbang pertama
+        require(
+            msg.sender == proposal.creator || msg.sender == proposal.buyer,
+            "Can't access proposal detail"
+        );
+
+        // SOLUSI: Kita balik logikanya menjadi POSITIF biar tidak terjebak bug casing string.
+        // "Jika pengirimnya ADALAH creator, langsung loloskan tanpa masuk ke require status"
+        if (msg.sender == proposal.creator) {
+            return proposal.detail;
+        }
+
+        // Jalur di bawah ini HANYA akan dieksekusi oleh si Buyer resmi
         require(
             proposal.status == WowoProposalStatus.Accepted,
             "Proposal not accepted yet"
-        );
-        require(
-            proposal.buyer == msg.sender || proposal.creator == msg.sender,
-            "Can't access proposal detail"
         );
 
         return proposal.detail;

@@ -8,6 +8,7 @@
     "dev": "bash scripts/contracts/Deploy.sh",
     "testMain": "bash scripts/contracts/TestMain.sh",
     "test": "npx hardhat test",
+    "resetWowo": "bash scripts/contracts/ResetWowo.sh",
     "deployTestWowoIdeas": "bash scripts/contracts/DeployTestWowoIdeas.sh"
   },
   "keywords": [],
