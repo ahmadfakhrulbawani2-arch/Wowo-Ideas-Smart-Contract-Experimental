@@ -1,12 +1,13 @@
 # Wowo Ideas Smart Contract (Experimental)
 
-![Solidity](https://img.shields.io/badge/Solidity-%23363636.svg?style=for-the-badge&logo=solidity&logoColor=white)
-![Hardhat](https://img.shields.io/badge/Hardhat-%23F8CC46.svg?style=for-the-badge&logo=hardhat&logoColor=black)
-![TypeScript](https://img.shields.io/badge/TypeScript-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)
-![GitHub Repo stars](https://img.shields.io/github/stars/ahmadfakhrulbawani2-arch/Wowo-Ideas-Smart-Contract-Experimental?style=for-the-badge&color=yellow)
-![GitHub forks](https://img.shields.io/github/forks/ahmadfakhrulbawani2-arch/Wowo-Ideas-Smart-Contract-Experimental?style=for-the-badge&color=blue)
-![GitHub watchers](https://img.shields.io/github/watchers/ahmadfakhrulbawani2-arch/Wowo-Ideas-Smart-Contract-Experimental?style=for-the-badge&color=green)
-![GitHub repo size](https://img.shields.io/github/repo-size/ahmadfakhrulbawani2-arch/Wowo-Ideas-Smart-Contract-Experimental?style=for-the-badge&color=orange)
+<div align="center">
+  <img src="https://img.shields.io/badge/Solidity-%23363636.svg?style=for-the-badge&logo=solidity&logoColor=white">
+  <img src="https://img.shields.io/badge/Hardhat-%23F8CC46.svg?style=for-the-badge&logo=hardhat&logoColor=black">
+  <img src="https://img.shields.io/badge/TypeScript-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white">
+  <img src="https://img.shields.io/github/repo-size/ahmadfakhrulbawani2-arch/Wowo-Ideas-Smart-Contract-Experimental?style=for-the-badge&color=orange">
+  <img src="https://img.shields.io/github/stars/ahmadfakhrulbawani2-arch/Wowo-Ideas-Smart-Contract-Experimental?style=for-the-badge&color=yellow">
+  <img src="https://img.shields.io/github/forks/ahmadfakhrulbawani2-arch/Wowo-Ideas-Smart-Contract-Experimental?style=for-the-badge&color=purple">
+</div>
 
 Wowo Ideas is an experimental decentralized idea marketplace platform built on top of the Ethereum Virtual Machine (EVM). This smart contract allows users to publish their creative ideas onto the blockchain in a secure, state-protected proposal format. Innovators (_creators_) can monetize their intellectual property, while interested parties (_buyers_) can seamlessly fund or acquire the underlying details of the idea.
 
